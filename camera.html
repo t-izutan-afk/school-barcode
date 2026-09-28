@@ -1,147 +1,286 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>学校用バーコード検索</title>
-<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-<style>
-body{font-family:Arial,"Noto Sans JP",sans-serif;margin:0;padding:20px;background:#f5f5f5;color:#222}
-.container{max-width:600px;margin:auto;background:white;padding:20px;border-radius:14px;box-shadow:0 2px 10px #ccc}
-h1{font-size:22px;text-align:center}
-button{font-size:18px;padding:14px 20px;margin:8px 0;border:0;border-radius:10px;background:#1976d2;color:white;width:100%}
-button:disabled{background:#aaa}
-#reader{width:100%;margin-top:15px}
-#result{margin-top:20px;padding:15px;border-radius:10px;background:#eef6ff;white-space:pre-wrap}
-#error{margin-top:15px;padding:12px;border-radius:10px;background:#fff0f0;color:#b00020;display:none;white-space:pre-wrap}
-.small{font-size:13px;color:#666}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学校商品バーコード検索</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin: 20px;
+    }
+
+    h1 {
+      font-size: 24px;
+    }
+
+    button {
+      font-size: 20px;
+      padding: 12px 24px;
+      margin: 10px;
+    }
+
+    #reader {
+      width: 100%;
+      max-width: 500px;
+      margin: 20px auto;
+    }
+
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      border: 1px solid #ccc;
+      text-align: left;
+      font-size: 18px;
+    }
+
+    .error {
+      color: red;
+    }
+  </style>
 </head>
+
 <body>
-<div class="container">
-<h1>📦 学校用バーコード検索</h1>
-<p class="small">JANコードをカメラで読み取り、商品マスターを検索します。</p>
-<button id="startBtn">📷 カメラを起動</button>
-<button id="stopBtn" style="display:none;background:#555">⏹ カメラを停止</button>
+
+<h1>📦 学校商品バーコード検索</h1>
+
+<button onclick="startCamera()">📷 カメラを起動</button>
+
 <div id="reader"></div>
-<div id="error"></div>
-<div id="result">まだ読み取っていません。</div>
+
+<div id="result">
+  バーコードを読み取ってください。
 </div>
+
 <script>
-// ★ここにGoogle Apps ScriptのウェブアプリURLを設定してください
-const API_URL = 'https://script.google.com/macros/s/AKfycbxyHwcb1LTp-oEte5PBOe1cycldgodDFcBUAfE0jPrHwpciPRuWcQWfZm3nd7oBSOxFCA/exec';
 
-let scanner = null;
-let running = false;
-let lastCode = '';
+const API_URL =
+  'https://script.google.com/macros/s/AKfycbxyHwcb1LTp-oEte5PBOe1cycldgodDFcBUAfE0jPrHwpciPRuWcQWfZm3nd7oBSOxFCA/exec';
 
-const startBtn = document.getElementById('startBtn');
-const stopBtn = document.getElementById('stopBtn');
-const result = document.getElementById('result');
-const errorBox = document.getElementById('error');
+let html5QrCode = null;
 
-function showError(message) {
-  errorBox.textContent = '⚠️ ' + message;
-  errorBox.style.display = 'block';
-}
-function clearError() {
-  errorBox.textContent = '';
-  errorBox.style.display = 'none';
-}
 
-async function startCamera() {
-  clearError();
-  if (!window.isSecureContext) {
-    showError('HTTPSのページで開いてください。GitHub PagesのURLなら通常は問題ありません。');
-    return;
-  }
-  if (API_URL.includes('ここにApps Script')) {
-    // カメラ自体は起動できるので、API未設定でもカメラテストは可能
-    result.textContent = 'カメラを起動します。JANコードを読み取ると、Apps Scriptの設定が必要です。';
-  }
-  try {
-    scanner = new Html5Qrcode('reader');
-    await scanner.start(
-      { facingMode: 'environment' },
-      {
-        fps: 10,
-        qrbox: { width: 280, height: 140 },
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8
-        ]
-      },
-      onScanSuccess,
-      () => {}
-    );
-    running = true;
-    startBtn.style.display = 'none';
-    stopBtn.style.display = 'block';
-    result.textContent = '📷 カメラ起動中です。JANコードを映してください。';
-  } catch (e) {
-    console.error(e);
-    showError('カメラを起動できませんでした。\n\n原因：' + (e && e.message ? e.message : e));
-  }
+/* =========================
+   カメラ開始
+========================= */
+
+function startCamera() {
+
+  document.getElementById("result").innerHTML =
+    "📷 カメラを起動しています…";
+
+  html5QrCode = new Html5Qrcode("reader");
+
+  html5QrCode.start(
+    { facingMode: "environment" },
+
+    {
+      fps: 10,
+      qrbox: {
+        width: 300,
+        height: 150
+      }
+    },
+
+    function(decodedText) {
+
+      console.log("読み取り：" + decodedText);
+
+      document.getElementById("result").innerHTML =
+        "🔍 JANコード：" + decodedText +
+        "<br>商品情報を検索しています…";
+
+      searchProduct(decodedText);
+
+    },
+
+    function(errorMessage) {
+      // 読み取り途中のエラーは無視
+    }
+
+  ).catch(function(err) {
+
+    document.getElementById("result").innerHTML =
+      "<p class='error'>❌ カメラを起動できませんでした。</p>" +
+      "<p>" + err + "</p>";
+
+  });
 }
 
-async function stopCamera() {
-  if (scanner && running) {
-    try { await scanner.stop(); } catch(e) { console.error(e); }
-  }
-  running = false;
-  startBtn.style.display = 'block';
-  stopBtn.style.display = 'none';
-  result.textContent = 'カメラを停止しました。';
-}
 
-function onScanSuccess(decodedText) {
-  const jan = String(decodedText).replace(/\D/g, '');
-  if (!jan || jan === lastCode) return;
-  if (jan.length !== 8 && jan.length !== 13) return;
-  lastCode = jan;
-  result.textContent = '🔎 JANコード：' + jan + '\n\n商品を検索しています…';
-  searchProduct(jan);
-}
+/* =========================
+   Apps Script検索
+   JSONP方式
+========================= */
 
 function searchProduct(jan) {
-  if (API_URL.includes('ここにApps Script')) {
-    result.textContent = 'JANコード：' + jan + '\n\n⚠️ Apps ScriptのURLがまだ設定されていません。';
-    return;
-  }
-  const callbackName = 'jsonp_' + Date.now();
+
+  const callbackName =
+    "jsonpCallback_" + Date.now();
+
+  const script = document.createElement("script");
+
+  const url =
+    API_URL +
+    "?action=search" +
+    "&jan=" + encodeURIComponent(jan) +
+    "&callback=" + callbackName;
+
   window[callbackName] = function(data) {
-    try {
-      if (data && data.found) {
-        result.textContent =
-          '✅ 商品が見つかりました\n\n' +
-          'JANコード：' + (data.jan || jan) + '\n' +
-          '商品名：' + (data.name || '') + '\n' +
-          'メーカー：' + (data.maker || '') + '\n' +
-          '規格・容量：' + (data.spec || '') + '\n' +
-          '保管場所：' + (data.location || '') + '\n' +
-          '在庫数：' + (data.stock ?? '') + '\n' +
-          '使用期限：' + (data.expiry || '') + '\n' +
-          '備考：' + (data.note || '');
-      } else {
-        result.textContent = '❓ 未登録の商品です。\n\nJANコード：' + jan + '\n\n商品マスターへの登録が必要です。';
-      }
-    } finally {
-      delete window[callbackName];
-      if (script && script.parentNode) script.parentNode.removeChild(script);
+
+    console.log("Apps Script応答：", data);
+
+    if (data.success && data.status === "found") {
+
+      document.getElementById("result").innerHTML =
+
+        "<h2>✅ 商品が見つかりました</h2>" +
+
+        "<p><b>JANコード：</b>" +
+        escapeHtml(data.jan) +
+        "</p>" +
+
+        "<p><b>商品名：</b>" +
+        escapeHtml(data.name) +
+        "</p>" +
+
+        "<p><b>メーカー：</b>" +
+        escapeHtml(data.maker) +
+        "</p>" +
+
+        "<p><b>規格・容量：</b>" +
+        escapeHtml(data.specification) +
+        "</p>" +
+
+        "<p><b>保管場所：</b>" +
+        escapeHtml(data.location) +
+        "</p>" +
+
+        "<p><b>在庫数：</b>" +
+        escapeHtml(data.stock) +
+        "</p>" +
+
+        "<p><b>使用期限：</b>" +
+        escapeHtml(data.expiration) +
+        "</p>" +
+
+        "<p><b>備考：</b>" +
+        escapeHtml(data.note) +
+        "</p>";
+
+    } else if (data.status === "notfound") {
+
+      document.getElementById("result").innerHTML =
+
+        "<h2>⚠️ 商品が登録されていません</h2>" +
+
+        "<p>JANコード：</p>" +
+
+        "<p><b>" +
+        escapeHtml(jan) +
+        "</b></p>" +
+
+        "<button onclick=\"registerUnknown('" +
+        escapeHtml(jan) +
+        "')\">" +
+        "未登録商品として記録" +
+        "</button>";
+
+    } else {
+
+      document.getElementById("result").innerHTML =
+        "<p class='error'>❌ " +
+        escapeHtml(data.message || "検索エラー") +
+        "</p>";
     }
-  };
-  const script = document.createElement('script');
-  script.src = API_URL + '?action=search&jan=' + encodeURIComponent(jan) + '&callback=' + callbackName;
-  script.onerror = function() {
-    result.textContent = '⚠️ Apps Scriptに接続できませんでした。';
+
     delete window[callbackName];
-    if (script.parentNode) script.parentNode.removeChild(script);
+    script.remove();
   };
+
+  window[callbackName].error = function() {
+
+    document.getElementById("result").innerHTML =
+      "<p class='error'>❌ Apps Scriptに接続できません。</p>";
+
+    delete window[callbackName];
+    script.remove();
+  };
+
+  script.src = url;
+
   document.body.appendChild(script);
 }
 
-startBtn.addEventListener('click', startCamera);
-stopBtn.addEventListener('click', stopCamera);
+
+/* =========================
+   未登録JANを記録
+========================= */
+
+function registerUnknown(jan) {
+
+  const callbackName =
+    "jsonpRegister_" + Date.now();
+
+  const script = document.createElement("script");
+
+  const url =
+    API_URL +
+    "?action=registerUnknown" +
+    "&jan=" + encodeURIComponent(jan) +
+    "&callback=" + callbackName;
+
+  window[callbackName] = function(data) {
+
+    if (data.success) {
+
+      document.getElementById("result").innerHTML =
+        "<h2>✅ 記録しました</h2>" +
+        "<p>JANコード：" +
+        escapeHtml(jan) +
+        "</p>";
+
+    } else {
+
+      document.getElementById("result").innerHTML =
+        "<p class='error'>❌ " +
+        escapeHtml(data.message || "登録エラー") +
+        "</p>";
+    }
+
+    delete window[callbackName];
+    script.remove();
+  };
+
+  script.src = url;
+
+  document.body.appendChild(script);
+}
+
+
+/* =========================
+   HTML特殊文字対策
+========================= */
+
+function escapeHtml(value) {
+
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 </script>
+
 </body>
 </html>
